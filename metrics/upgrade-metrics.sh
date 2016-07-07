@@ -1,5 +1,7 @@
 #!/bin/sh
 # Set the following Env variables to configure update 
+# clone origin metrics project https://github.com/openshift/origin-metrics
+#
 # export IMAGE_PREFIX=registry.access.redhat.com/openshift3/
 # export HAWKULAR_METRICS_HOSTNAME=metrics.example.com
 # export CASSANDRA_PV_SIZE=50Gi
