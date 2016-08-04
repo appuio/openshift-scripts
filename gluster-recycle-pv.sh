@@ -49,10 +49,10 @@ while getopts ":ap:" opt; do
   case $opt in
     a)
       # Get all PVs in failed state
-      persistent_volumes=($(oc get pv --no-headers | grep -i failed | awk '{print $1}'))
+      pvs=($(oc get pv --no-headers | grep -i failed | awk '{print $1}'))
 
       # Exit if there are no PVs to recycle
-      if [ ${#persistent_volumes[@]} -eq 0 ] ; then
+      if [ ${#pvs[@]} -eq 0 ] ; then
         echo "INFO: No PVs in failed state. Exiting."
         exit 0
       fi
@@ -68,7 +68,7 @@ while getopts ":ap:" opt; do
       fi
 
       # Add to pv array
-      persistent_volumes[$i]=$requested_pv
+      pvs[$i]=$requested_pv
       i=$((i+1))
       ;;
     \?)
@@ -86,7 +86,7 @@ done
 
 shift $((OPTIND-1))
 
-if [ -z $persistent_volumes ]; then
+if [ ${#pvs[@]} -eq 0 ]; then
   echo "ERROR: Either choose to recycle all PVs (-a) or specify one (-p)." >&2
   showsyntax
   exit 1
@@ -95,7 +95,7 @@ fi
 
 # Get confirmation
 echo -e "\nPVs to recycle:"
-printf '%s\n' "${persistent_volumes[@]}"
+printf '%s\n' "${pvs[@]}"
 
 echo -e "\nAll data on these PVs will be erased.\nDo you wish to continue?"
 select yn in "Yes" "No"; do
@@ -107,23 +107,20 @@ done
 
 
 # Recycle procedure for every single PV
-for persistent_volume in "${persistent_volumes[@]}"; do
+for pv_name in "${pvs[@]}"; do
 
   # Get size of existing PV
   OIFS="$IFS"
   IFS=';'
-  pv_info=($(oc get pv "$persistent_volume" -o template --template='{{.spec.capacity.storage}};{{.spec.glusterfs.path}};{{.spec.glusterfs.endpoints}}' 2>/dev/null))
+  pv_info=($(oc get pv "$pv_name" -o template --template='{{.spec.capacity.storage}};{{.spec.glusterfs.path}};{{.spec.glusterfs.endpoints}}' 2>/dev/null))
   pv_size=${pv_info[0]}
   pv_path=${pv_info[1]}
   pv_ep=${pv_info[2]}
   IFS="$OIFS"
  
-  # Delete PV in OpenShift
-  oc delete pv "$persistent_volume"
- 
   # Mount GlusterFS volume
-  mkdir $temp_mount
-  mount -t glusterfs ${gluster_node_ip}:${persistent_volume} $temp_mount
+  mkdir -p $temp_mount
+  mount -t glusterfs "${gluster_node_ip}":"${pv_path}" $temp_mount
  
   # Delete GlusterFS volume content
   rm -rf ${temp_mount:?}/*
@@ -131,29 +128,29 @@ for persistent_volume in "${persistent_volumes[@]}"; do
   # Unmount GlusterFS volume
   umount $temp_mount
  
-  # Recreate PV in OpenShift
-  cat <<-EOF | oc create -f -
-{
+  # Replace PV in OpenShift
+cat <<-EOF | oc replace -f -
+  {
     "kind": "PersistentVolume",
     "apiVersion": "v1",
     "metadata": {
-        "name": "${persistent_volume}",
+      "name": "${pv_name}"
     },
     "spec": {
-        "capacity": {
-            "storage": "${pv_size}"
-        },
-        "glusterfs": {
-            "endpoints": "${pv_ep}",
-            "path": "${pv_path}"
-        },
-        "accessModes": [
-            "ReadWriteOnce",
-            "ReadWriteMany"
-        ],
-        "persistentVolumeReclaimPolicy": "Recycle"
-    },
-}
+      "capacity": {
+          "storage": "${pv_size}"
+      },
+      "glusterfs": {
+          "endpoints": "${pv_ep}",
+          "path": "${pv_path}"
+      },
+      "accessModes": [
+          "ReadWriteOnce",
+          "ReadWriteMany"
+      ],
+      "persistentVolumeReclaimPolicy": "Recycle"
+    }
+  }
 EOF
 
 done
