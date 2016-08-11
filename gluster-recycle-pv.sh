@@ -19,13 +19,13 @@ i=0
 # Check prerequisites
 ## Check if executed as root
 if [[ $EUID -ne 0 ]]; then
-  echo "ERROR: This script must be run as root. Aborting."
+  echo "ERROR: This script must be run as root. Aborting." >&2
   exit 1
 fi
 
 ## Check if executed on OSE master
 if ! systemctl status atomic-openshift-master >/dev/null 2>&1; then
-  echo "ERROR: This script must be run on an OpenShift master. Aborting."
+  echo "ERROR: This script must be run on an OpenShift master. Aborting." >&2
   exit 1
 fi
 
@@ -118,9 +118,14 @@ for pv_name in "${pvs[@]}"; do
   pv_ep=${pv_info[2]}
   IFS="$OIFS"
  
-  # Mount GlusterFS volume
+  # Check if target is already mounted
   mkdir -p $temp_mount
-  mount -t glusterfs "${gluster_node_ip}":"${pv_path}" $temp_mount
+
+  # Mount GlusterFS volume
+  if ! mount -t glusterfs "${gluster_node_ip}":"${pv_path}" $temp_mount; then
+    echo "ERROR: Could not mount "${gluster_node_ip}":"${pv_path}" to $temp_mount. Error code was $?. Aborting." >&2
+    exit 1
+  fi
  
   # Delete GlusterFS volume content
   rm -rf ${temp_mount:?}/*
