@@ -118,10 +118,8 @@ for pv_name in "${pvs[@]}"; do
   pv_ep=${pv_info[2]}
   IFS="$OIFS"
  
-  # Check if target is already mounted
-  mkdir -p $temp_mount
-
   # Mount GlusterFS volume
+  mkdir -p $temp_mount
   if ! mount -t glusterfs "${gluster_node_ip}":"${pv_path}" $temp_mount; then
     echo "ERROR: Could not mount "${gluster_node_ip}":"${pv_path}" to $temp_mount. Error code was $?. Aborting." >&2
     exit 1
