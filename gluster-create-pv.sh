@@ -23,7 +23,7 @@ create_gluster_brick() {
   node=$3
 
   if ! ssh $node test -b "/dev/vg_gluster/$vol_name"; then
-    ssh $node lvcreate --name $vol_name --size ${vol_size}G vg_gluster -y >/dev/null 2>&1
+    ssh $node lvcreate --name $vol_name --size ${vol_size}Gi vg_gluster -y >/dev/null 2>&1
 
     ssh $node mkfs.xfs -i size=512 /dev/vg_gluster/$vol_name >/dev/null 2>&1
   else
@@ -156,7 +156,7 @@ cat <<-EOF | oc create -n default -f -
     },
     "spec": {
       "capacity": {
-        "storage": "${vol_size}G"
+        "storage": "${vol_size}Gi"
       },
       "accessModes": [
         "ReadWriteOnce",
