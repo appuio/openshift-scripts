@@ -129,7 +129,8 @@ for pv_name in "${pvs[@]}"; do
   umount $temp_mount
  
   # Replace PV in OpenShift
-cat <<-EOF | oc replace -f -
+  oc delete pv $pv_name
+cat <<-EOF | oc create -f -
   {
     "kind": "PersistentVolume",
     "apiVersion": "v1",
