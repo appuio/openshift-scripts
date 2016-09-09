@@ -23,17 +23,13 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-## Check if executed on OSE master
-if ! systemctl status atomic-openshift-master >/dev/null 2>&1; then
-  echo "ERROR: This script must be run on an OpenShift master. Aborting." >&2
-  exit 1
-fi
+## Check if oc client is installed
+command -v oc >/dev/null 2>&1 || { echo >&2 "ERROR: oc is required but it's not installed. Aborting."; exit 1; }
 
-## FIXME: Is this a good idea? Maybe just abort and output command to execute manually.
 ## Check if executed as OSE system:admin
 if [[ "$(oc whoami)" != "system:admin" ]]; then
   echo "Logging in as user system:admin..."
-  echo "oc login -u system:admin > /dev/null"
+  oc login -u system:admin > /dev/null
 fi
 
 
