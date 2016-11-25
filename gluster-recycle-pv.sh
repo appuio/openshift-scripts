@@ -122,7 +122,10 @@ for pv_name in "${pvs[@]}"; do
   fi
  
   # Delete GlusterFS volume content
-  rm -rf ${temp_mount:?}/*
+  if ! rm -rf ${temp_mount:?}/*; then
+    echo "ERROR: Could not clean everything on "${pv_path}". Aborting." >&2
+    exit 1
+  fi
 
   # Unmount GlusterFS volume
   umount $temp_mount
