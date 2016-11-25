@@ -31,7 +31,7 @@ create_gluster_brick() {
     exit 1
   fi  
   
-  ssh $node 'echo "/dev/vg_gluster/$vol_name /data/$vol_name xfs noatime 0 0" >> /etc/fstab'
+  ssh $node "echo \"/dev/vg_gluster/${vol_name} /data/${vol_name} xfs noatime 0 0\" >> /etc/fstab"
   
   if ! ssh $node test -d "/data/$vol_name"; then
     ssh $node mkdir -p /data/$vol_name/brick
