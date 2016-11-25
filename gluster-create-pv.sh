@@ -25,7 +25,7 @@ create_gluster_brick() {
   if ! ssh $node test -b "/dev/vg_gluster/$vol_name"; then
     ssh $node lvcreate --name $vol_name --size ${vol_size}G vg_gluster -y >/dev/null 2>&1
 
-    ssh $node mkfs.xfs -i size=512 /dev/vg_gluster/$vol_name >/dev/null 2>&1
+    ssh $node mkfs.xfs -f -i size=512 /dev/vg_gluster/$vol_name >/dev/null 2>&1
   else
     echo "ERROR: Failed to create logical volume /dev/vg_gluster/$vol_name. Volume already exists. Aborting."
     exit 1
