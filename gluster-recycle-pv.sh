@@ -122,7 +122,7 @@ for pv_name in "${pvs[@]}"; do
   fi
  
   # Delete GlusterFS volume content
-  if ! rm -rf ${temp_mount:?}/*; then
+  if ! find ${temp_mount:?} -mindepth 1 -not -path "${temp_mount:?}/.trashcan*" -delete
     echo "ERROR: Could not clean everything on "${pv_path}". Aborting." >&2
     exit 1
   fi
