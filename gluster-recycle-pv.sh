@@ -113,23 +113,23 @@ for pv_name in "${pvs[@]}"; do
   pv_path=${pv_info[1]}
   pv_ep=${pv_info[2]}
   IFS="$OIFS"
- 
+
   # Mount GlusterFS volume
   mkdir -p $temp_mount
   if ! mount -t glusterfs "${gluster_node_ip}":"${pv_path}" $temp_mount; then
     echo "ERROR: Could not mount "${gluster_node_ip}":"${pv_path}" to $temp_mount. Error code was $?. Aborting." >&2
     exit 1
   fi
- 
+
   # Delete GlusterFS volume content
-  if ! find ${temp_mount:?} -mindepth 1 -not -path "${temp_mount:?}/.trashcan*" -delete
+  if ! find ${temp_mount:?} -mindepth 1 -not -path "${temp_mount:?}/.trashcan*" -delete; then
     echo "ERROR: Could not clean everything on "${pv_path}". Aborting." >&2
     exit 1
   fi
 
   # Unmount GlusterFS volume
   umount $temp_mount
- 
+
   # Replace PV in OpenShift
   oc delete pv $pv_name
 cat <<-EOF | oc create -f -
@@ -157,4 +157,3 @@ cat <<-EOF | oc create -f -
 EOF
 
 done
-
