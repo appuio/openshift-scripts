@@ -9,7 +9,7 @@
 # external etcd (not on master) | /var/lib/etcd
 # embedded etcd (on master)     | /var/lib/origin/etcd
 
-ETCD_DATA_DIR="/var/lib/origin/etcd"
+ETCD_DATA_DIR="/var/lib/origin/openshift.local.etcd"
 BACKUP_DIR="/root/openshift_backup"
 BACKUP_DIR_WITH_DATE=${BACKUP_DIR}_$(date +%Y%m%d%H%M)
 
