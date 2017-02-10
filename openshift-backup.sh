@@ -40,6 +40,12 @@ etcdctl backup \
 
 
 ### Project Backup
+# Check if executed as OSE system:admin
+if [[ "$(oc whoami)" != "system:admin" ]]; then
+  echo -n "Trying to log in as system:admin... "
+  oc login -u system:admin > /dev/null && echo "done."
+fi
+
 for project in $(oc get projects --no-headers | awk '{print $1}')
 do
     mkdir -p ${BACKUP_DIR_WITH_DATE}/${project}
