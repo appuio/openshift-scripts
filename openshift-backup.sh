@@ -27,13 +27,16 @@ tar cf ${BACKUP_DIR_WITH_DATE}/certs-and-keys-$(hostname).tar \
     named_certificates/*
 
 #FIXME: According to docs this is only necessary if etcd is running on more than one host
-# Restart etcd
+# Stop etcd
 #systemctl stop etcd
 
 # Create an etcd backup
 etcdctl backup \
     --data-dir $ETCD_DATA_DIR \
     --backup-dir ${BACKUP_DIR_WITH_DATE}/etcd.bak
+
+# Start etcd again
+#systemctl start etcd
 
 
 ### Project Backup
