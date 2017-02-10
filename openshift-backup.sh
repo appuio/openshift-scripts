@@ -22,18 +22,6 @@ mkdir -p $BACKUP_DIR_WITH_DATE
 # Backup certificates and keys
 cd /etc/origin/master
 tar cf ${BACKUP_DIR_WITH_DATE}/certs-and-keys-$(hostname).tar \
-#    master.proxy-client.crt \
-#    master.proxy-client.key \
-#    proxyca.crt \
-#    proxyca.key \
-#    master.server.crt \
-#    master.server.key \
-#    ca.crt \
-#    ca.key \
-#    master.etcd-client.crt \
-#    master.etcd-client.key \
-#    master.etcd-ca.crt
-#FIXME: Replace with
     *.crt \
     *.key \
     named_certificates/*
