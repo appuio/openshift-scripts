@@ -21,19 +21,23 @@ mkdir -p $BACKUP_DIR_WITH_DATE
 ### Cluster Backup
 # Backup certificates and keys
 cd /etc/origin/master
+echo -n "Backing up certificates and keys... "
 tar cf ${BACKUP_DIR_WITH_DATE}/certs-and-keys-$(hostname).tar \
     *.crt \
     *.key \
-    named_certificates/*
+    named_certificates/* \
+    && echo "done."
 
 #FIXME: According to docs this is only necessary if etcd is running on more than one host
 # Stop etcd
 #systemctl stop etcd
 
 # Create an etcd backup
+echo -n "Backing up etcd... "
 etcdctl backup \
     --data-dir $ETCD_DATA_DIR \
-    --backup-dir ${BACKUP_DIR_WITH_DATE}/etcd.bak
+    --backup-dir ${BACKUP_DIR_WITH_DATE}/etcd.bak \
+    && echo "done."
 
 # Start etcd again
 #systemctl start etcd
@@ -49,11 +53,13 @@ fi
 # Backup all resources of every project
 for project in $(oc get projects --no-headers | awk '{print $1}')
 do
+    echo -n "Backing up project $project... "
     mkdir -p ${BACKUP_DIR_WITH_DATE}/projects/${project}
     oc export all -o json -n ${project} > ${BACKUP_DIR_WITH_DATE}/projects/${project}/project.json 2>/dev/null
     oc export rolebindings -o json -n ${project} > ${BACKUP_DIR_WITH_DATE}/projects/${project}/rolebindings.json 2>/dev/null
     oc get serviceaccount -o json --export=true -n ${project} > ${BACKUP_DIR_WITH_DATE}/projects/${project}/serviceaccount.json 2>/dev/null
     oc get secret -o json --export=true -n ${project} > ${BACKUP_DIR_WITH_DATE}/projects/${project}/secret.json 2>/dev/null
     oc get pvc -o json --export=true -n ${project} > pvc.json 2>/dev/null
+    echo "done."
 done
 
