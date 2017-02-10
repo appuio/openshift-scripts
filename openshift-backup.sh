@@ -46,13 +46,14 @@ if [[ "$(oc whoami)" != "system:admin" ]]; then
   oc login -u system:admin > /dev/null && echo "done."
 fi
 
+# Backup all resources of every project
 for project in $(oc get projects --no-headers | awk '{print $1}')
 do
-    mkdir -p ${BACKUP_DIR_WITH_DATE}/${project}
-    oc export all -o json -n ${project} > ${BACKUP_DIR_WITH_DATE}/${project}/project.json
-    oc export rolebindings -o json -n ${project} > ${BACKUP_DIR_WITH_DATE}/${project}/rolebindings.json
-    oc get serviceaccount -o json --export=true -n ${project} > ${BACKUP_DIR_WITH_DATE}/${project}/serviceaccount.json
-    oc get secret -o json --export=true -n ${project} > ${BACKUP_DIR_WITH_DATE}/${project}/secret.json
-    oc get pvc -o json --export=true -n ${project} > pvc.json
+    mkdir -p ${BACKUP_DIR_WITH_DATE}/projects/${project}
+    oc export all -o json -n ${project} > ${BACKUP_DIR_WITH_DATE}/projects/${project}/project.json 2>/dev/null
+    oc export rolebindings -o json -n ${project} > ${BACKUP_DIR_WITH_DATE}/projects/${project}/rolebindings.json 2>/dev/null
+    oc get serviceaccount -o json --export=true -n ${project} > ${BACKUP_DIR_WITH_DATE}/projects/${project}/serviceaccount.json 2>/dev/null
+    oc get secret -o json --export=true -n ${project} > ${BACKUP_DIR_WITH_DATE}/projects/${project}/secret.json 2>/dev/null
+    oc get pvc -o json --export=true -n ${project} > pvc.json 2>/dev/null
 done
 
