@@ -20,8 +20,8 @@ export es_pod=$(oc -n logging get pods -l component=es -o name | head -n 1)
 
 e2e_indices="$(
   es_curl 'https://localhost:9200/_aliases' \
-    | jq '. | with_entries(select(.key | startswith("project.(bd|e2e)-"))) | keys ' \
-    | grep '"' | cut -d '"' -f2
+    | jq -M 'keys | map(select(. | test("project.(bd|e2e)-")))' \
+    | awk -F'"' '/"/{print $2}'
 )" || :
 
 for idx in $e2e_indices; do
