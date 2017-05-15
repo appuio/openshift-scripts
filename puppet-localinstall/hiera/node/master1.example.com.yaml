@@ -1,0 +1,347 @@
+--- openshift3::deployment_type: enterprise openshift3::version: 3.4.1.18
+#openshift3::docker_version: 1.10.3
+#openshift3::ansible_version: 2.2.0.0
+#openshift3::openshift_ansible_version: openshift-ansible-3.3.54-1
+
+openshift3::sdn_network_plugin_name: redhat/openshift-ovs-multitenant
+openshift3::app_domain: ocp.example.com
+openshift3::install_metrics: true
+openshift3::install_logging: true
+openshift3::metrics_domain: metrics.ocp.example.com
+openshift3::logging_domain: logging.ocp.example.com
+openshift3::master_cluster_method: native
+openshift3::master_cluster_hostname: master-int-ocp.example.com   # address for internal master load balancer, must present OpenShift SSL certificate
+openshift3::master_cluster_public_hostname: master-ocp.example.com   # address for external master load balancer, should present browser accepted SSL cert
+openshift3::master_public_api_url: https://master-ocp.example.com
+openshift3::master_public_console_url: https://master-ocp.example.com/console
+openshift3::master_extensions:
+  - name: clients
+    sourceDirectory: /usr/share/atomic-openshift
+openshift3::configure_epel: false
+#openshift3::epel_repo_id: CUSTOM_EPEL
+openshift3::rhsm_repos: []
+
+openshift3::registry_ip: 172.30.0.1
+openshift3::install_router: false
+openshift3::failover_routers:
+  groups:
+    dc1:
+      replicas: 2
+      ips: '172.18.1.21-22'
+openshift3::enable_ops_logging: false
+openshift3::registry_volume_size: 100G
+#openshift3::metrics_image_version: latest
+openshift3::metrics_use_persistent_storage: true
+openshift3::enable_ops_logging: false
+openshift3::logging_local_storage: /data/logging-storage
+openshift3::run_upgrade_playbooks: false
+
+openshift3::ansible_vars:
+  openshift_master_api_port: 443
+  openshift_master_console_port: 443
+  openshift_use_manageiq: false
+  openshift_use_nuage: false
+  ansible_ssh_user: ansible
+  ansible_become: yes
+  openshift_use_dnsmasq: False
+  openshift_http_proxy: http://outproxy.example.com:8080/
+  openshift_https_proxy: http://outproxy.example.com:8080/
+  openshift_no_proxy: 127.0.0.1,localhost,.example.com
+  openshift_builddefaults_http_proxy: http://outproxy.example.com:8080/
+  openshift_builddefaults_https_proxy: http://outproxy.example.com:8080/
+  openshift_builddefaults_no_proxy: ['127.0.0.1,localhost,.example.com']  # workaround for join(',') in OpenShift playbook
+  openshift_builddefaults_git_http_proxy: http://outproxy.example.com:8080/
+  openshift_builddefaults_git_https_proxy: http://outproxy.example.com:8080/
+  osm_cluster_network_cidr: 10.127.64.0/18
+  osm_host_subnet_length: 7
+  openshift_portal_net: 10.127.0.0/18
+  osm_api_server_args:
+    deserialization-cache-size: ['1000']
+  osm_default_node_selector: type=user-node
+  osm_project_request_template: default/project-request
+  kubeletArguments:
+    cadvisor-port:
+    - "4194"
+  appuio_extra_iptables: |
+    -A INPUT -i eth1 -p tcp -m state --state NEW -m tcp --dport 22 -j ACCEPT
+
+openshift3::masters:
+  - name: master1.example.com
+    hostname: master1.example.com
+    ip: 172.18.1.16
+    node_labels:
+      region: infra
+      zone: default
+      logging-infra-fluentd: "true"
+      type: master
+    schedulable: False
+  - name: master2.example.com
+    hostname: master2.example.com
+    ip: 172.18.1.17
+    node_labels:
+      region: infra
+      zone: default
+      logging-infra-fluentd: "true"
+      type: master
+    schedulable: False
+  - name: master3.example.com
+    hostname: master3.example.com
+    ip: 172.18.1.18
+    node_labels:
+      region: infra
+      zone: default
+      logging-infra-fluentd: "true"
+      type: master
+    schedulable: False
+
+openshift3::etcd:
+  - name: master1.example.com
+  - name: master2.example.com
+  - name: master3.example.com
+
+openshift3::nodes:
+  - name: node1.example.com
+    hostname: node1.example.com
+    ip: 172.18.1.11
+    node_labels:
+      region: primary
+      zone: default
+      logging-infra-es: "true"
+      logging-infra-fluentd: "true"
+      type: app-node
+    node_local_quota_per_fsgroup: 1Gi
+
+openshift3::groups:
+# Host group defining Gluster cluster hosts
+  gluster:
+    # replica set 1
+    - name: gluster1.example.com
+    - name: gluster2.example.com
+    - name: gluster3.example.com    
+
+    # replica set 2
+    - name: gluster4.example.com
+    - name: gluster5.example.com
+    - name: gluster6.example.com
+
+    # replica set 3
+    - name: gluster7.example.com
+    - name: gluster8.example.com
+    - name: gluster9.example.com
+
+openshift3::group_vars:
+  # Group variable for Gluster
+  gluster:
+    deployment: community
+    default_replicas: 3
+    default_arbiter: 0
+    gluster_network: 172.18.1.0/24,172.28.1.0/24
+    repo_url: http://repo-mirror.example.com/distributor/testing/rhel7-server-$basearch/gluster-upstream/gluster-3_8
+    repo_gpgkey_url: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-Centos-Storage-SIG
+    repo_gpgkey_file: |
+        -----BEGIN PGP PUBLIC KEY BLOCK-----
+        Version: GnuPG v2.0.22 (GNU/Linux)
+        
+        mQENBFTCLWABCADDHh5ktfB+78L6yxcIxwbZgaLKTp0mKvM3i2CjBrbw+xHJ4x9E
+        mn39rkTJf2UHOK0PgAp3FftoAFCtrSAXuanNGpEcpSxXDzxNj2QMpAbySZ2r4RpL
+        qxNVlB73dHuASXIMlhyV1ASpM6Me0dpaTtyKj38kRPFkWWuIUaiEQzXFgztYx7Kp
+        i+we0iUBfSKY47l2rbqyu9qZ8kCeMjuSuLfG5OKw+fj9zwqFJkc+LAz8IPTF4g7p
+        48m0m5bUPvKIIa1BfYcyqaTMxfbqjGaF1M37zF1O0TUKGQ+8VddzQmwg7GglQMt3
+        FqVer1WJUNPXyEgmZMzfmg7lqdPKKYaQBLk1ABEBAAG0XkNlbnRPUyBTdG9yYWdl
+        IFNJRyAoaHR0cDovL3dpa2kuY2VudG9zLm9yZy9TcGVjaWFsSW50ZXJlc3RHcm91
+        cC9TdG9yYWdlKSA8c2VjdXJpdHlAY2VudG9zLm9yZz6JATkEEwECACMFAlTCLWAC
+        GwMHCwkIBwMCAQYVCAIJCgsEFgIDAQIeAQIXgAAKCRDUouUL5FHltbq9B/93dtpt
+        lQG2mVvGik9TFgRdt+p3CPTqT1fwNzhB3iO02yJu5oM6s4FB1XqKRaKlqtvtBzyT
+        geAwenu74aU1hFv4uq+uETCanUaSgOvTcCn5WXUpOvlwKJV7TUjLSNRfp2dAG8Ig
+        d3euLnfajCE13t5BrqhTAlaMxAbGAqtzr6K9y0hUeT0ogjrscfoQSVptlcLs8d7m
+        P+VMR4GUfvUAws65JZxBaal4N7eIIZCWktnJ+B3dE3/tsAksGyXGLaSroPSuY18V
+        wksdBuscKVV49Ees0SbhvSrF5JJ07ccUt43SSFun84iNW4nuiWm2QOOKMcd182Sk
+        d9SDUTFu/G4s2gx7
+        =a0nM
+        -----END PGP PUBLIC KEY BLOCK-----
+
+    # Global options for all Gluster volumes.
+    gluster_pv_default_options:
+      cluster.quorum-type: auto  # Always recommended to ensure correct quorum config
+      
+      # Disable pre-fetching and caching of file stat(2) information when a directory is read.
+      # Required to prevent corruption with PostgreSQL an possibly MySQL.
+      performance.stat-prefetch: "off"
+
+    gluster_pvs:
+#      - name: gluster-pv1
+#        group: gluster1
+#        size: 100
+#        options:
+#          # Increase write cache size to speed up push operations for registry.
+#          performance.write-behind-window-size: 32MB
+#      - name: gluster-pv2
+#        size: 50
+#        options:
+#          cluster.post-op-delay-secs: "0"
+#          cluster.consistent-metadata: "on"
+#      - name: gluster-pv3
+#        size: 50
+#        options:
+#          cluster.post-op-delay-secs: "0"
+#          cluster.consistent-metadata: "on"
+#      - name: gluster-pv11
+#        size: 1
+#      - name: gluster-pv12
+#        size: 1
+#      - name: gluster-pv13
+#        size: 1
+#      - name: gluster-pv14
+#        size: 1
+#      - name: gluster-pv15
+#        size: 1
+#      - name: gluster-pv16
+#        size: 1
+#      - name: gluster-pv17
+#        size: 1
+#      - name: gluster-pv18
+#        size: 10
+#      - name: gluster-pv19
+#        size: 10
+#      - name: gluster-pv20
+#        size: 1
+#      - name: gluster-pv21
+#        size: 1
+#      - name: gluster-pv22
+#        size: 1
+#      - name: gluster-pv23
+#        size: 1
+#      - name: gluster-pv24
+#        size: 1
+#      - name: gluster-pv25
+#        size: 1
+#      - name: gluster-pv26
+#        size: 1
+#      - name: gluster-pv27
+#        size: 1
+#      - name: gluster-pv28
+#        size: 1
+#      - name: gluster-pv29
+#        size: 1
+#      - name: gluster-pv30
+#        size: 1
+#      - name: gluster-pv31
+#        size: 5
+#      - name: gluster-pv32
+#        size: 5
+#      - name: gluster-pv33
+#        size: 5
+#      - name: gluster-pv34
+#        size: 5
+#      - name: gluster-pv35
+#        size: 5
+#      - name: gluster-pv36
+#        size: 10
+#      - name: gluster-pv37
+#        size: 10
+#      - name: gluster-pv38
+#        size: 20
+#      - name: gluster-pv39
+#        size: 20
+#      - name: gluster-pv40
+#        size: 40
+#      - name: gluster-pv41
+#        size: 10
+#      - name: gluster-pv42
+#        size: 10
+#      - name: gluster-pv43
+#        size: 10
+#      - name: gluster-pv44
+#        size: 10
+#      - name: gluster-pv45
+#        size: 10
+
+      - name: gluster-pv101
+        size: 100
+        options:
+          # Increase write cache size to speed up push operations for registry.
+          performance.write-behind-window-size: 32MB
+      - name: gluster-pv102
+        size: 50
+        options:
+          cluster.post-op-delay-secs: "0"
+          cluster.consistent-metadata: "on"
+      - name: gluster-pv103
+        size: 50
+        options:
+          cluster.post-op-delay-secs: "0"
+          cluster.consistent-metadata: "on"
+      - name: gluster-pv111
+        size: 1
+      - name: gluster-pv112
+        size: 1
+      - name: gluster-pv113
+        size: 1
+      - name: gluster-pv114
+        size: 10
+      - name: gluster-pv115
+        size: 1
+      - name: gluster-pv116
+        size: 1
+      - name: gluster-pv117
+        size: 1
+      - name: gluster-pv118
+        size: 10
+      - name: gluster-pv119
+        size: 10
+      - name: gluster-pv120
+        size: 1
+      - name: gluster-pv121
+        size: 1
+      - name: gluster-pv122
+        size: 1
+      - name: gluster-pv123
+        size: 1
+      - name: gluster-pv124
+        size: 1
+      - name: gluster-pv125
+        size: 1
+      - name: gluster-pv126
+        size: 1
+      - name: gluster-pv127
+        size: 1
+      - name: gluster-pv128
+        size: 1
+      - name: gluster-pv129
+        size: 1
+      - name: gluster-pv130
+        size: 1
+      - name: gluster-pv131
+        size: 5
+      - name: gluster-pv132
+        size: 5
+      - name: gluster-pv133
+        size: 5
+      - name: gluster-pv134
+        size: 5
+      - name: gluster-pv135
+        size: 5
+      - name: gluster-pv136
+        size: 10
+      - name: gluster-pv137
+        size: 10
+      - name: gluster-pv138
+        size: 20
+      - name: gluster-pv139
+        size: 20
+      - name: gluster-pv140
+        size: 40
+      - name: gluster-pv141
+        size: 10
+      - name: gluster-pv142
+        size: 10
+      - name: gluster-pv143
+        size: 10
+      - name: gluster-pv144
+        size: 10
+      - name: gluster-pv145
+        size: 10
+      - name: gluster-pv146
+        size: 100
+      - name: gluster-pv147
+        size: 1000

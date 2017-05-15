@@ -1,0 +1,460 @@
+{
+  "kind": "Template",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "letsencrypt",
+    "creationTimestamp": null
+  },
+  "objects": [
+    {
+      "kind": "ImageStream",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "letsencrypt",
+        "creationTimestamp": null,
+        "labels": {
+          "app": "letsencrypt"
+        }
+      },
+      "spec": {}
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ImageStream",
+      "metadata": {
+        "name": "rhel7",
+        "labels": {
+          "app": "appuio-infra"
+        }
+      },
+      "spec": {
+        "dockerImageRepository": "registry.access.redhat.com/rhel7"
+      }
+    },
+    {
+      "kind": "ImageStream",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "haproxy",
+        "creationTimestamp": null,
+        "labels": {
+          "app": "letsencrypt"
+        }
+      },
+      "spec": {}
+    },
+    {
+      "kind": "ImageStream",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "ose-haproxy-router",
+        "creationTimestamp": null,
+        "labels": {
+          "app": "letsencrypt"
+        }
+      },
+      "spec": {
+        "tags": [
+          {
+            "name": "latest",
+            "from": {
+              "kind": "DockerImage",
+              "name": "registry.access.redhat.com/openshift3/ose-haproxy-router:latest"
+            },
+            "importPolicy": {}
+          }
+        ]
+      }
+    },
+    {
+      "kind": "BuildConfig",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "letsencrypt",
+        "creationTimestamp": null,
+        "labels": {
+          "app": "letsencrypt"
+        }
+      },
+      "spec": {
+        "triggers": [
+          {
+            "type": "GitHub",
+            "github": {
+              "secret": "${GITHUB_WEBHOOK_SECRET}"
+            }
+          },
+          {
+            "type": "Generic",
+            "generic": {
+              "secret": "${GENERIC_WEBHOOK_SECRET}"
+            }
+          },
+          {
+            "type": "ConfigChange"
+          },
+          {
+            "type": "ImageChange",
+            "imageChange": {}
+          }
+        ],
+        "source": {
+          "type": "Git",
+          "git": {
+            "uri": "https://github.com/appuio/letsencrypt"
+          },
+          "secrets": []
+        },
+        "strategy": {
+          "type": "Docker",
+          "dockerStrategy": {
+            "from": {
+              "kind": "ImageStreamTag",
+              "name": "rhel7:latest"
+            }
+          }
+        },
+        "output": {
+          "to": {
+            "kind": "ImageStreamTag",
+            "name": "letsencrypt:latest"
+          }
+        },
+        "resources": {},
+        "postCommit": {}
+      }
+    },
+    {
+      "kind": "BuildConfig",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "haproxy",
+        "creationTimestamp": null,
+        "labels": {
+          "app": "letsencrypt"
+        }
+      },
+      "spec": {
+        "triggers": [
+          {
+            "type": "GitHub",
+            "github": {
+              "secret": "${GITHUB_WEBHOOK_SECRET}"
+            }
+          },
+          {
+            "type": "Generic",
+            "generic": {
+              "secret": "${GENERIC_WEBHOOK_SECRET}"
+            }
+          },
+          {
+            "type": "ConfigChange"
+          },
+          {
+            "type": "ImageChange",
+            "imageChange": {}
+          }
+        ],
+        "source": {
+          "type": "Git",
+          "git": {
+            "uri": "https://github.com/appuio/haproxy"
+          },
+          "secrets": []
+        },
+        "strategy": {
+          "type": "Docker",
+          "dockerStrategy": {
+            "from": {
+              "kind": "ImageStreamTag",
+              "name": "ose-haproxy-router:latest"
+            }
+          }
+        },
+        "output": {
+          "to": {
+            "kind": "ImageStreamTag",
+            "name": "haproxy:latest"
+          }
+        },
+        "resources": {},
+        "postCommit": {}
+      }
+    },
+    {
+      "kind": "DeploymentConfig",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "letsencrypt",
+        "creationTimestamp": null,
+        "labels": {
+          "app": "letsencrypt"
+        }
+      },
+      "spec": {
+        "strategy": {
+          "type": "Rolling",
+          "rollingParams": {
+            "updatePeriodSeconds": 1,
+            "intervalSeconds": 1,
+            "timeoutSeconds": 600,
+            "maxUnavailable": "25%",
+            "maxSurge": "25%"
+          },
+          "resources": {}
+        },
+        "triggers": [
+          {
+            "type": "ConfigChange"
+          },
+          {
+            "type": "ImageChange",
+            "imageChangeParams": {
+              "automatic": true,
+              "containerNames": [
+                "letsencrypt"
+              ],
+              "from": {
+                "kind": "ImageStreamTag",
+                "name": "letsencrypt:latest"
+              }
+            }
+          }
+        ],
+        "replicas": 1,
+        "test": false,
+        "selector": {
+          "app": "letsencrypt",
+          "deploymentconfig": "letsencrypt"
+        },
+        "template": {
+          "metadata": {
+            "creationTimestamp": null,
+            "labels": {
+              "app": "letsencrypt",
+              "deploymentconfig": "letsencrypt"
+            }
+          },
+          "spec": {
+            "volumes": [
+              {
+                "name": "letsencrypt-data",
+                "persistentVolumeClaim": {
+                  "claimName": "letsencrypt-data"
+                }
+              },
+              {
+                "name": "oauth-proxy-secret",
+                "secret": {
+                  "secretName": "oauth-proxy"
+                }
+              }
+            ],
+            "containers": [
+              {
+                "name": "letsencrypt",
+                "image": "letsencrypt:latest",
+                "ports": [
+                  {
+                    "containerPort": 8080,
+                    "protocol": "TCP"
+                  }
+                ],
+                "resources": {},
+                "volumeMounts": [
+                  {
+                    "name": "letsencrypt-data",
+                    "mountPath": "/var/lib/letsencrypt"
+                  }
+                ],
+                "terminationMessagePath": "/dev/termination-log",
+                "imagePullPolicy": "Always"
+              },
+              {
+                "name": "letsencrypt-proxy",
+                "image": "registry.access.redhat.com/openshift3/logging-auth-proxy:latest",
+                "ports": [
+                  {
+                    "name": "oaproxy",
+                    "containerPort": 3000,
+                    "protocol": "TCP"
+                  }
+                ],
+                "env": [
+                  {
+                    "name": "OAP_BACKEND_URL",
+                    "value": "http://localhost:8080"
+                  },
+                  {
+                    "name": "OAP_AUTH_MODE",
+                    "value": "oauth2"
+                  },
+                  {
+                    "name": "OAP_TRANSFORM",
+                    "value": "user_header,token_header"
+                  },
+                  {
+                    "name": "OAP_OAUTH_ID",
+                    "value": "letsencrypt-oauth-proxy"
+                  },
+                  {
+                    "name": "OAP_MASTER_URL",
+                    "value": "https://kubernetes.default.svc.cluster.local"
+                  },
+                  {
+                    "name": "OAP_PUBLIC_MASTER_URL",
+                    "value": "${PUBLIC_MASTER_URL}"
+                  },
+                  {
+                    "name": "OAP_MASTER_CA_FILE",
+                    "value": "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+                  },
+                  {
+                    "name": "OAP_DEBUG",
+                    "value": "true"
+                  }
+                ],
+                "resources": {},
+                "volumeMounts": [
+                  {
+                    "name": "oauth-proxy-secret",
+                    "mountPath": "/secret"
+                  }
+                ],
+                "terminationMessagePath": "/dev/termination-log",
+                "imagePullPolicy": "Always"
+              }
+            ],
+            "restartPolicy": "Always",
+            "terminationGracePeriodSeconds": 30,
+            "dnsPolicy": "ClusterFirst",
+            "securityContext": {}
+          }
+        }
+      }
+    },
+    {
+      "kind": "Route",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "letsencrypt",
+        "creationTimestamp": null,
+        "labels": {
+          "app": "letsencrypt"
+        }
+      },
+      "spec": {
+        "host": "${LETSENCRYPT_HOST}",
+        "to": {
+          "kind": "Service",
+          "name": "letsencrypt"
+        },
+        "tls": {
+          "termination": "passthrough"
+        },
+        "port": {
+          "targetPort": "443-tcp"
+        }
+      }
+    },
+    {
+      "kind": "Route",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "letsencrypt-challenge",
+        "labels": {
+          "app": "letsencrypt"
+        }
+      },
+      "spec": {
+        "host": "${LETSENCRYPT_HOST}",
+        "path": "/.well-known/acme-challenge",
+        "to": {
+          "kind": "Service",
+          "name": "letsencrypt"
+        },
+        "port": {
+          "targetPort": "8080-tcp"
+        }
+      }
+    },
+    {
+      "kind": "Service",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "letsencrypt",
+        "creationTimestamp": null,
+        "labels": {
+          "app": "letsencrypt"
+        }
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "443-tcp",
+            "protocol": "TCP",
+            "port": 443,
+            "targetPort": "oaproxy"
+          },
+          {
+            "name": "8080-tcp",
+            "protocol": "TCP",
+            "port": 8080,
+            "targetPort": 8080
+          }
+        ],
+        "selector": {
+          "app": "letsencrypt",
+          "deploymentconfig": "letsencrypt"
+        },
+        "type": "ClusterIP",
+        "sessionAffinity": "None"
+      }
+    },
+    {
+      "kind": "PersistentVolumeClaim",
+      "apiVersion": "v1",
+      "metadata": {
+        "name": "letsencrypt-data",
+        "creationTimestamp": null
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "1Gi"
+          }
+        }
+      }
+    }
+  ],
+  "parameters": [
+    {
+      "description": "OpenShift public master URL",
+      "name": "PUBLIC_MASTER_URL",
+      "required": true
+    },
+    {
+      "description": "Hostname of Let's Encrypt integration",
+      "name": "LETSENCRYPT_HOST",
+      "required": true
+    },
+    {
+      "description": "GitHub trigger secret",
+      "name": "GITHUB_WEBHOOK_SECRET",
+      "from": "[a-zA-Z0-9]{8}",
+      "generate": "expression",
+      "required": true
+    },
+    {
+      "description": "Generic build trigger secret",
+      "name": "GENERIC_WEBHOOK_SECRET",
+      "from": "[a-zA-Z0-9]{8}",
+      "generate": "expression",
+      "required": true
+    }
+  ]
+}

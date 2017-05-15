@@ -1,0 +1,10 @@
+---
+:backends:
+  - yaml
+
+:hierarchy:
+  - "node/%{::fqdn}"
+  - "common"
+
+:yaml:
+  :datadir: 'hiera'
