@@ -1,0 +1,136 @@
+#!/bin/bash
+
+set -e -u -o pipefail
+
+usage() {
+  echo "Usage: $0 [-n <name-regex>] [-t <storage-type>] [-D]"
+  echo
+  echo 'At least one filter is required.'
+  echo
+  echo 'Options:'
+  echo ' -n  Filter on PV name (regular expression)'
+  echo ' -t  Filter on PV type (key name in PV object; i.e. "glusterfs" or "hostPath")'
+  echo ' -D  Delete matching pods'
+}
+
+opt_pvname_filter=
+opt_pvtype_filter=
+opt_delete_pods=
+
+while getopts 'hn:t:D' opt; do
+  case "$opt" in
+    h)
+      usage
+      exit 0
+      ;;
+    n) opt_pvname_filter="$OPTARG" ;;
+    t) opt_pvtype_filter="$OPTARG" ;;
+    D) opt_delete_pods=yes ;;
+    *)
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+shift $((OPTIND - 1))
+
+if [[ "$#" -gt 0 ]]; then
+  usage >&2
+  exit 1
+fi
+
+if [[ -z "$opt_pvname_filter" && -z "$opt_pvtype_filter" ]]; then
+  usage >&2
+  exit 1
+fi
+
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+
+#
+# Wrapper for OpenShift client storing output in local cache file
+#
+cached_oc() {
+  local cachefile="${tmpdir}/${*//\//#}"
+
+  if ! [[ -e "$cachefile" ]]; then
+    oc "$@" > "$cachefile"
+  fi
+
+  cat "$cachefile"
+}
+
+#
+# Produce shell-evaluatable list of pods together with namespace and PVC names
+#
+get_pods() {
+  cached_oc -n default get --all-namespaces -o json pod |
+  jq -r '
+    .items |
+    map({
+        namespace: .metadata.namespace,
+        name: .metadata.name,
+        pvc: ([.spec.volumes[].persistentVolumeClaim.claimName | select(.)] | unique)
+      } |
+      # Drop pods without volume claims
+      select(.pvc | length > 0)
+    ) |
+    sort_by([.namespace, .name]) |
+    .[] |
+    @sh "namespace=\(.namespace) name=\(.name) podpvc=( \(.pvc) )"
+  '
+}
+
+#
+# Check whether PV object with given name uses wanted storage type
+#
+wanted_pvtype() {
+  local -r pvtype="$1" name="$2"
+
+  cached_oc -n default get -o json pv "$name" | \
+  jq -r --exit-status --arg pvtype "$pvtype" '.spec[$pvtype] // false' >/dev/null
+}
+
+wanted() {
+  local -r ns="$1"; shift
+  local -r pod="$1"; shift
+  local i pv_name
+
+  for i; do
+    pv_name=$(
+      cached_oc -n "$ns" get -o json pvc "$i" |
+      jq -r '.spec.volumeName | @text'
+      )
+
+    echo "Volume claim \"${i}\", PV name \"${pv_name}\"" >&2
+
+    if [[ -z "$opt_pvname_filter" || "$pv_name" =~ $opt_pvname_filter ]] && \
+       ( [[ -z "$opt_pvtype_filter" ]] || wanted_pvtype "$opt_pvtype_filter" "$pv_name" )
+    then
+      echo 'Match found' >&2
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+get_pods | \
+while read -r raw; do
+  eval "$raw"
+
+  echo "${namespace}/pod/${name}" >&2
+
+  if wanted "$namespace" "$name" "${podpvc[@]}" && \
+     [[ -n "$opt_delete_pods" ]]; then
+    oc -n "$namespace" delete pod "$name"
+    sleep 1
+  fi
+
+  echo
+done
+
+echo Finished >&2
+
+# vim: set sw=2 sts=2 et :
