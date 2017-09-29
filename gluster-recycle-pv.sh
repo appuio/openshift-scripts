@@ -106,54 +106,33 @@ done
 for pv_name in "${pvs[@]}"; do
 
   # Get size of existing PV
-  OIFS="$IFS"
-  IFS=';'
-  pv_info=($(oc get pv "$pv_name" -o template --template='{{.spec.capacity.storage}};{{.spec.glusterfs.path}};{{.spec.glusterfs.endpoints}}' 2>/dev/null))
-  pv_size=${pv_info[0]}
-  pv_path=${pv_info[1]}
-  pv_ep=${pv_info[2]}
-  IFS="$OIFS"
+  pv_path=$(oc get pv "$pv_name" -o template --template='{{.spec.glusterfs.path}}')
 
   # Mount GlusterFS volume
   mkdir -p $temp_mount
   if ! mount -t glusterfs "${gluster_node_ip}":"${pv_path}" $temp_mount; then
-    echo "ERROR: Could not mount '${gluster_node_ip}:${pv_path}' to $temp_mount. Error code was $?. Aborting." >&2
+    echo "ERROR: Could not mount \"${gluster_node_ip}\":\"${pv_path}\" to $temp_mount. Error code was $?. Aborting." >&2
     exit 1
   fi
 
   # Delete GlusterFS volume content
   if ! find ${temp_mount:?} -mindepth 1 -not -path "${temp_mount:?}/.trashcan*" -delete; then
-    echo "ERROR: Could not clean everything on '${pv_path}'. Aborting." >&2
+    echo "ERROR: Could not clean everything on \"${pv_path}\". Aborting." >&2
     exit 1
   fi
 
   # Unmount GlusterFS volume
   umount $temp_mount
 
-  # Replace PV in OpenShift
-  oc delete pv $pv_name
-cat <<-EOF | oc create -f -
-  {
-    "kind": "PersistentVolume",
-    "apiVersion": "v1",
+  # Make PV available again
+  oc patch pv "$pv_name" -p '{
     "metadata": {
-      "name": "${pv_name}"
+      "annotations": {
+        "pv.kubernetes.io/bound-by-controller": null
+      }
     },
     "spec": {
-      "capacity": {
-          "storage": "${pv_size}"
-      },
-      "glusterfs": {
-          "endpoints": "${pv_ep}",
-          "path": "${pv_path}"
-      },
-      "accessModes": [
-          "ReadWriteOnce",
-          "ReadWriteMany"
-      ],
-      "persistentVolumeReclaimPolicy": "Recycle"
+      "claimRef": null
     }
-  }
-EOF
-
+  }'
 done
