@@ -117,13 +117,13 @@ for pv_name in "${pvs[@]}"; do
   # Mount GlusterFS volume
   mkdir -p $temp_mount
   if ! mount -t glusterfs "${gluster_node_ip}":"${pv_path}" $temp_mount; then
-    echo "ERROR: Could not mount "${gluster_node_ip}":"${pv_path}" to $temp_mount. Error code was $?. Aborting." >&2
+    echo "ERROR: Could not mount '${gluster_node_ip}:${pv_path}' to $temp_mount. Error code was $?. Aborting." >&2
     exit 1
   fi
 
   # Delete GlusterFS volume content
   if ! find ${temp_mount:?} -mindepth 1 -not -path "${temp_mount:?}/.trashcan*" -delete; then
-    echo "ERROR: Could not clean everything on "${pv_path}". Aborting." >&2
+    echo "ERROR: Could not clean everything on '${pv_path}'. Aborting." >&2
     exit 1
   fi
 
