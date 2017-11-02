@@ -124,7 +124,7 @@ while read -r raw; do
 
   if wanted "$namespace" "$name" "${podpvc[@]}" && \
      [[ -n "$opt_delete_pods" ]]; then
-    oc -n "$namespace" delete pod "$name"
+    oc -n "$namespace" delete --ignore-not-found pod "$name"
     sleep 1
   fi
 
