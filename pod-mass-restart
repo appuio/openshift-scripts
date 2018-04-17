@@ -9,12 +9,13 @@ usage() {
   echo
   echo 'Options:'
   echo ' -n  Filter on PV name (regular expression)'
-  echo ' -t  Filter on PV type (key name in PV object; i.e. "glusterfs" or "hostPath")'
+  echo ' -t  Filter on PV type (key name in PV object; i.e. "glusterfs"' \
+    'or "hostPath"; may be specified more than once)'
   echo ' -D  Delete matching pods'
 }
 
 opt_pvname_filter=
-opt_pvtype_filter=
+opt_pvtype_filters=()
 opt_delete_pods=
 
 while getopts 'hn:t:D' opt; do
@@ -24,7 +25,7 @@ while getopts 'hn:t:D' opt; do
       exit 0
       ;;
     n) opt_pvname_filter="$OPTARG" ;;
-    t) opt_pvtype_filter="$OPTARG" ;;
+    t) opt_pvtype_filters+=("$OPTARG") ;;
     D) opt_delete_pods=yes ;;
     *)
       usage >&2
@@ -40,7 +41,7 @@ if [[ "$#" -gt 0 ]]; then
   exit 1
 fi
 
-if [[ -z "$opt_pvname_filter" && -z "$opt_pvtype_filter" ]]; then
+if [[ -z "$opt_pvname_filter" && -z "${opt_pvtype_filters[*]-}" ]]; then
   usage >&2
   exit 1
 fi
@@ -86,10 +87,19 @@ get_pods() {
 # Check whether PV object with given name uses wanted storage type
 #
 wanted_pvtype() {
-  local -r pvtype="$1" name="$2"
+  local -r name="$1"; shift
 
-  cached_oc -n default get -o json pv "$name" | \
-  jq -r --exit-status --arg pvtype "$pvtype" '.spec[$pvtype] // false' >/dev/null
+  if [[ "$#" -lt 1 ]]; then
+    echo "Missing PV types" >&2
+    return 1
+  fi
+
+  cached_oc -n default get -o json pv/"$name" | \
+  jq -r --exit-status --arg joined_pvtypes "$*" '
+    .spec as $spec |
+    $joined_pvtypes | split("[[:blank:]]+"; "") |
+    any($spec[.] // false)
+  ' >/dev/null
 }
 
 wanted() {
@@ -103,12 +113,10 @@ wanted() {
       jq -r '.spec.volumeName | @text'
       )
 
-    echo "Volume claim \"${i}\", PV name \"${pv_name}\"" >&2
-
     if [[ -z "$opt_pvname_filter" || "$pv_name" =~ $opt_pvname_filter ]] && \
-       ( [[ -z "$opt_pvtype_filter" ]] || wanted_pvtype "$opt_pvtype_filter" "$pv_name" )
+       ( [[ -z "${opt_pvtype_filters[*]-}" ]] || wanted_pvtype "$pv_name" "${opt_pvtype_filters[@]}" )
     then
-      echo 'Match found' >&2
+      echo "Match found: ${ns}/pod/${pod}" >&2
       return 0
     fi
   done
@@ -120,14 +128,10 @@ get_pods | \
 while read -r raw; do
   eval "$raw"
 
-  echo "${namespace}/pod/${name}" >&2
-
   if wanted "$namespace" "$name" "${podpvc[@]}" && \
      [[ -n "$opt_delete_pods" ]]; then
     oc -n "$namespace" delete --ignore-not-found pod "$name"
   fi
-
-  echo
 done
 
 echo Finished >&2
