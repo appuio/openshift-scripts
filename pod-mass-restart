@@ -113,12 +113,10 @@ wanted() {
       jq -r '.spec.volumeName | @text'
       )
 
-    echo "Volume claim \"${i}\", PV name \"${pv_name}\"" >&2
-
     if [[ -z "$opt_pvname_filter" || "$pv_name" =~ $opt_pvname_filter ]] && \
        ( [[ -z "${opt_pvtype_filters[*]-}" ]] || wanted_pvtype "$pv_name" "${opt_pvtype_filters[@]}" )
     then
-      echo 'Match found' >&2
+      echo "Match found: ${ns}/pod/${pod}" >&2
       return 0
     fi
   done
@@ -130,14 +128,10 @@ get_pods | \
 while read -r raw; do
   eval "$raw"
 
-  echo "${namespace}/pod/${name}" >&2
-
   if wanted "$namespace" "$name" "${podpvc[@]}" && \
      [[ -n "$opt_delete_pods" ]]; then
     oc -n "$namespace" delete --ignore-not-found pod "$name"
   fi
-
-  echo
 done
 
 echo Finished >&2
