@@ -2,28 +2,34 @@
 
 set -e -u -o pipefail
 
+readonly annot_ignore=appuio.ch/pod-mass-restart-ignore
+
 usage() {
-  echo "Usage: $0 [-n <name-regex>] [-t <storage-type>] [-D]"
+  echo "Usage: $0 [-n <name-regex>] [-t <storage-type>] [-A] [-D]"
   echo
   echo 'At least one filter is required.'
   echo
   echo 'Options:'
+  echo ' -A  Match pods regardless of whether they have an' \
+    "\"$annot_ignore\" annotation"
   echo ' -n  Filter on PV name (regular expression)'
   echo ' -t  Filter on PV type (key name in PV object; i.e. "glusterfs"' \
     'or "hostPath"; may be specified more than once)'
   echo ' -D  Delete matching pods'
 }
 
+opt_annot_filter="$annot_ignore"
 opt_pvname_filter=
 opt_pvtype_filters=()
 opt_delete_pods=
 
-while getopts 'hn:t:D' opt; do
+while getopts 'hAn:t:D' opt; do
   case "$opt" in
     h)
       usage
       exit 0
       ;;
+    A) opt_annot_filter= ;;
     n) opt_pvname_filter="$OPTARG" ;;
     t) opt_pvtype_filters+=("$OPTARG") ;;
     D) opt_delete_pods=yes ;;
@@ -67,9 +73,15 @@ cached_oc() {
 #
 get_pods() {
   cached_oc -n default get --all-namespaces -o json pod |
-  jq -r '
+  jq -r --arg annot_filter "$opt_annot_filter" '
     .items |
-    map({
+    map(
+      if ($annot_filter | length) > 0 then
+        select(((.metadata.annotations[$annot_filter] // "") | length) == 0)
+      else
+        .
+      end |
+      {
         namespace: .metadata.namespace,
         name: .metadata.name,
         pvc: ([.spec.volumes[].persistentVolumeClaim.claimName | select(.)] | unique)
